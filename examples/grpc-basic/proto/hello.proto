@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package hello;
+
+service Messenger {
+  rpc SendMessage (Message) returns (Ack);
+}
+
+message Message {
+  string title = 1;
+  int32 id = 2;
+  string message = 3;
+}
+
+message Ack {
+  bool ok = 1;
+}
