@@ -1,5 +1,5 @@
 # Rust Systems Examples
-Small, focused Rust implementations of systems concepts.
+Rust implementations of different systems concepts.
 
 This repo is a concept lab: each example is intentionally minimal and self-contained so you can learn a topic quickly, run it, and reference it later.
 
