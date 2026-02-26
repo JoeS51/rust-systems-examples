@@ -1,4 +1,4 @@
-# rust-systems-examples
+# Rust Systems Examples
 Small, focused Rust implementations of systems concepts.
 
 This repo is a concept lab: each example is intentionally minimal and self-contained so you can learn a topic quickly, run it, and reference it later.
@@ -24,7 +24,8 @@ cargo run --manifest-path /path/to/examples/<example-name>/Cargo.toml --bin <bin
 ```
 
 ## Examples
-- `examples/grpc-basic`: minimal gRPC server/client using tonic + prost.
+- `examples/grpc-basic`: minimal gRPC server/client using tonic + prost. See `examples/grpc-basic/README.md`.
+- `examples/websockets`: planned websocket example. See `examples/websockets/README.md`.
 
 ## Notes
 - Examples favor clarity and small size over completeness.
