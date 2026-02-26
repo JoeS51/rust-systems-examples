@@ -9,7 +9,7 @@ This repo is a concept lab: each example is intentionally minimal and self-conta
 
 ## Getting started
 Prereqs:
-- Rust toolchain (stable)
+- Rust toolchain 
 - Additional tools as noted per example (e.g., `protoc` for gRPC)
 
 Run an example:
@@ -30,3 +30,4 @@ cargo run --manifest-path /path/to/examples/<example-name>/Cargo.toml --bin <bin
 ## Notes
 - Examples favor clarity and small size over completeness.
 - If an example uses codegen, check its `build.rs` or README for tool requirements.
+- rust-analyzer makes it easy to inspect generated code via “Go to Definition” on types from `tonic::include_proto!`.
