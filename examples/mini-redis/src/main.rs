@@ -1,23 +1,30 @@
+use bytes::Bytes;
 use mini_redis::{Connection, Frame};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use tokio::net::{TcpListener, TcpStream};
+
+type SharedDb = Arc<Vec<Mutex<HashMap<String, Bytes>>>>;
 
 #[tokio::main]
 async fn main() {
     let listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
 
+    println!("listening");
+
+    let db: Db = Arc::new(Mutex::new(HashMap::new()));
+
     loop {
         let (socket, _) = listener.accept().await.unwrap();
+        let db = db.clone();
         tokio::spawn(async move {
-            process(socket).await;
+            process(socket, db).await;
         });
     }
 }
 
-async fn process(socket: TcpStream) {
+async fn process(socket: TcpStream, db: Db) {
     use mini_redis::Command::{self, Get, Set};
-    use std::collections::HashMap;
-
-    let mut db = HashMap::new();
 
     let mut connection = Connection::new(socket);
 
@@ -26,12 +33,14 @@ async fn process(socket: TcpStream) {
 
         let response = match Command::from_frame(frame).unwrap() {
             Set(cmd) => {
-                db.insert(cmd.key().to_string(), cmd.value().to_vec());
+                let mut db = db.lock().unwrap();
+                db.insert(cmd.key().to_string(), cmd.value().clone());
                 Frame::Simple("OK".to_string())
             }
             Get(cmd) => {
+                let db = db.lock().unwrap();
                 if let Some(value) = db.get(cmd.key()) {
-                    Frame::Bulk(value.clone().into())
+                    Frame::Bulk(value.clone())
                 } else {
                     Frame::Null
                 }
@@ -41,4 +50,12 @@ async fn process(socket: TcpStream) {
 
         connection.write_frame(&response).await.unwrap();
     }
+}
+
+fn new_sharded_db(num_shards: usize) -> SharedDb {
+    let mut db = Vec::with_capacity(num_shards);
+    for _ in 0..num_shards {
+        db.push(Mutex::new(HashMap::new()));
+    }
+    Arc::new(db)
 }
