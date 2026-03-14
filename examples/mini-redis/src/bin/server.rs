@@ -12,7 +12,7 @@ async fn main() {
 
     println!("listening");
 
-    let db: Db = Arc::new(Mutex::new(HashMap::new()));
+    let db: SharedDb = Arc::new(Mutex::new(HashMap::new()));
 
     loop {
         let (socket, _) = listener.accept().await.unwrap();
