@@ -28,25 +28,27 @@
 //  - All URLs fetched concurrently (not sequentially!)
 //  - Errors are handled, not unwrap()'d
 //  - Clean, idiomatic code
+//
+//  Motivated by this repo!
+//  https://github.com/freddiehaddad/tokio-lessons
 
+use futures::future::join_all;
+use reqwest;
+use std::error::Error;
 use std::io;
 use std::time::Instant;
 use tokio::task;
-use reqwest;
-use futures::future::join_all;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn Error>> {
     println!("enter some urls (q when done):");
-    
+
     let mut urls: Vec<String> = Vec::new();
-    
+
     loop {
         let mut url = String::new();
 
-        io::stdin()
-            .read_line(&mut url)
-            .expect("Couldn't read line");
+        io::stdin().read_line(&mut url)?;
 
         if url.trim() == "q" {
             break;
@@ -59,21 +61,28 @@ async fn main() {
 
     let start_time = Instant::now();
     let mut handles = Vec::new();
-    
-    for (i, url) in urls.into_iter().enumerate() {
-        let handle = tokio::spawn(async move {
-            let req = reqwest::get(&url).await.unwrap();
 
+    for (i, url) in urls.into_iter().enumerate() {
+        let current_start_time = Instant::now();
+        let handle = tokio::spawn(async move {
+            let req = reqwest::get(&url).await?;
+
+            let url = url.trim().to_string();
             println!("Result {}:", i);
             println!("URL: {:?}", url);
             println!("Status code: {:?}", req.status());
+            println!("Request duration: {:?}", start_time.elapsed());
             println!("");
+
+            Ok::<(), reqwest::Error>(())
         });
         handles.push(handle);
     }
 
     join_all(handles).await;
-    
+
     let duration = start_time.elapsed();
     println!("Duration: {:?}", duration);
+
+    return Ok(());
 }
