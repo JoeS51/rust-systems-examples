@@ -37,7 +37,9 @@ use reqwest;
 use std::error::Error;
 use std::io;
 use std::time::Instant;
+use tokio::sync::mpsc;
 use tokio::task;
+use tokio::task::JoinSet;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -60,29 +62,34 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("");
 
     let start_time = Instant::now();
-    let mut handles = Vec::new();
+    let mut join_set = JoinSet::new();
 
     for (i, url) in urls.into_iter().enumerate() {
         let current_start_time = Instant::now();
-        let handle = tokio::spawn(async move {
-            let req = reqwest::get(&url).await?;
+        join_set.spawn(async move {
+            let req = reqwest::get(&url).await;
 
             let url = url.trim().to_string();
-            println!("Result {}:", i);
-            println!("URL: {:?}", url);
-            println!("Status code: {:?}", req.status());
-            println!("Request duration: {:?}", start_time.elapsed());
-            println!("");
-
-            Ok::<(), reqwest::Error>(())
+            (i, url, req, start_time.elapsed())
         });
-        handles.push(handle);
     }
 
-    join_all(handles).await;
-
-    let duration = start_time.elapsed();
-    println!("Duration: {:?}", duration);
+    while let Some(res) = join_set.join_next().await {
+        match res {
+            Ok((i, url, result, duration)) => {
+                println!("Result: {}", i);
+                println!("url: {}", url);
+                match result {
+                    Ok(resp) => println!("Status: {}", resp.status()),
+                    Err(_) => println!("couldn't GET url {}", i),
+                }
+                println!("Duration: {}", duration.as_millis());
+            }
+            Err(e) => {
+                eprintln!("Failed with {:?}", e);
+            }
+        }
+    }
 
     return Ok(());
 }
