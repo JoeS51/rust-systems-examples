@@ -2,7 +2,7 @@ use std::error::Error;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io;
-use std::io::{BufWriter, Write};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 
 #[derive(PartialEq)]
 enum OperationType {
@@ -34,12 +34,17 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         let curr_op = parse_line(&input)?;
 
-        if curr_op.operation_type == OperationType::Get {
-        } else {
-            let record = format!("{} {}\n", curr_op.key, curr_op.value.unwrap());
-            writer.write_all(record.as_bytes())?;
+        match curr_op.operation_type {
+            OperationType::Get => {
+                let scan_res = search_file(&curr_op.key)?;
+                println!("{}", scan_res);
+            }
+            OperationType::Set => {
+                let record = format!("{} {}\n", curr_op.key, curr_op.value.unwrap());
+                writer.write_all(record.as_bytes())?;
 
-            writer.flush()?;
+                writer.flush()?;
+            }
         }
     }
 }
@@ -62,4 +67,18 @@ fn parse_line(input: &str) -> Result<Operation, Box<dyn Error>> {
     }
 }
 
-// fn search_file(operation: OperationType, )
+fn search_file(key: &str) -> Result<String, Box<dyn Error>> {
+    let file = File::open("db.log")?;
+    let reader = BufReader::new(file);
+
+    let mut res = String::from("-1");
+    for line in reader.lines() {
+        let line = line?;
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts[0] == key {
+            res = parts[1].to_string();
+        }
+    }
+
+    Ok(res)
+}
