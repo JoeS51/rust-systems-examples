@@ -17,13 +17,15 @@ struct Operation {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let file = OpenOptions::new()
+    let mut n = 0;
+
+    let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open("db.log")?;
+        .open(format!("db{}.log", n))?;
 
-    let mut writer = BufWriter::new(&file);
-
+    let mut writer = BufWriter::new(file);
+    let mut num_records = 0;
     loop {
         println!("Enter DB operation (e.g. db set 1 hi) ");
         let mut input = String::new();
@@ -44,7 +46,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                 writer.write_all(record.as_bytes())?;
 
                 writer.flush()?;
+
+                num_records += 1;
             }
+        }
+
+        // Compaction
+        if num_records > 3 {
+            n += 1;
+            file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(format!("db{}.log", n))?;
+            println!("{:?}", file);
+
+            writer = BufWriter::new(file);
+            println!("{:?}", writer);
         }
     }
 }
@@ -71,7 +88,7 @@ fn search_file(key: &str) -> Result<String, Box<dyn Error>> {
     let file = File::open("db.log")?;
     let reader = BufReader::new(file);
 
-    let mut res = String::from("-1");
+    let mut res = String::from("not found");
     for line in reader.lines() {
         let line = line?;
         let parts: Vec<&str> = line.split_whitespace().collect();
