@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::fs::OpenOptions;
@@ -38,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         match curr_op.operation_type {
             OperationType::Get => {
-                let scan_res = search_file(&curr_op.key)?;
+                let scan_res = search_file(&curr_op.key, n)?;
                 println!("{}", scan_res);
             }
             OperationType::Set => {
@@ -53,6 +54,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         // Compaction
         if num_records > 3 {
+            compact_old_log(format!("db{}.log", n))?;
             n += 1;
             file = OpenOptions::new()
                 .create(true)
@@ -62,6 +64,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             writer = BufWriter::new(file);
             println!("{:?}", writer);
+            num_records = 0;
         }
     }
 }
@@ -84,18 +87,51 @@ fn parse_line(input: &str) -> Result<Operation, Box<dyn Error>> {
     }
 }
 
-fn search_file(key: &str) -> Result<String, Box<dyn Error>> {
-    let file = File::open("db.log")?;
-    let reader = BufReader::new(file);
+fn search_file(key: &str, n: i32) -> Result<String, Box<dyn Error>> {
+    for segment in (0..n).rev() {
+        let file = File::open(format!("db{}.log", segment))?;
+        let reader = BufReader::new(file);
 
-    let mut res = String::from("not found");
-    for line in reader.lines() {
-        let line = line?;
-        let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts[0] == key {
-            res = parts[1].to_string();
+        let mut found = None;
+
+        for line in reader.lines() {
+            let line = line?;
+            let parts: Vec<&str> = line.split_whitespace().collect();
+
+            if parts.len() == 2 && parts[0] == key {
+                found = Some(parts[1].to_string());
+            }
+        }
+
+        if let Some(value) = found {
+            return Ok(value);
         }
     }
 
-    Ok(res)
+    Ok("not found".to_string())
+}
+
+fn compact_old_log(file_name: String) -> Result<String, Box<dyn Error>> {
+    let file = File::open(file_name)?;
+    let reader = BufReader::new(&file);
+    let mut entries: HashMap<String, String> = HashMap::new();
+    for line in reader.lines() {
+        let line = line?;
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        entries.insert(parts[0].to_string(), parts[1].to_string());
+    }
+
+    let compacted_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("compacted_log.log")?;
+    let mut writer = BufWriter::new(compacted_file);
+
+    for entry in entries {
+        let record = format!("{} {}\n", entry.0, entry.1);
+        writer.write_all(record.as_bytes())?;
+        writer.flush()?;
+    }
+
+    Ok("test".to_string())
 }
