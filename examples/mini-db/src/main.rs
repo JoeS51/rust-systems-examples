@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::error::Error;
-use std::fs::File;
 use std::fs::OpenOptions;
+use std::fs::{self, File};
 use std::io;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 
@@ -54,7 +54,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         // Compaction
         if num_records > 3 {
-            compact_old_log(format!("db{}.log", n))?;
             n += 1;
             file = OpenOptions::new()
                 .create(true)
@@ -63,7 +62,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("{:?}", file);
 
             writer = BufWriter::new(file);
-            println!("{:?}", writer);
+            compact_old_log(n - 1)?;
+
             num_records = 0;
         }
     }
@@ -111,8 +111,11 @@ fn search_file(key: &str, n: i32) -> Result<String, Box<dyn Error>> {
     Ok("not found".to_string())
 }
 
-fn compact_old_log(file_name: String) -> Result<String, Box<dyn Error>> {
-    let file = File::open(file_name)?;
+fn compact_old_log(segment: i32) -> Result<String, Box<dyn Error>> {
+    let original = format!("db{}.log", segment);
+    let temp = format!("db{}.tmp", segment);
+
+    let file = File::open(&original)?;
     let reader = BufReader::new(&file);
     let mut entries: HashMap<String, String> = HashMap::new();
     for line in reader.lines() {
@@ -121,17 +124,24 @@ fn compact_old_log(file_name: String) -> Result<String, Box<dyn Error>> {
         entries.insert(parts[0].to_string(), parts[1].to_string());
     }
 
-    let compacted_file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("compacted_log.log")?;
-    let mut writer = BufWriter::new(compacted_file);
+    {
+        let temp_file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&temp)?;
 
-    for entry in entries {
-        let record = format!("{} {}\n", entry.0, entry.1);
-        writer.write_all(record.as_bytes())?;
+        let mut writer = BufWriter::new(temp_file);
+
+        for (key, value) in entries {
+            let record = format!("{} {}\n", key, value);
+            writer.write_all(record.as_bytes())?;
+        }
+
         writer.flush()?;
     }
+
+    fs::rename(&temp, &original)?;
 
     Ok("test".to_string())
 }
