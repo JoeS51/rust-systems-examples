@@ -27,6 +27,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut writer = BufWriter::new(file);
     let mut num_records = 0;
+
+    let mut index: HashMap<String, usize> = HashMap::new();
+    let mut cursor: usize = 0;
+
     loop {
         println!("Enter DB operation (e.g. db set 1 hi) ");
         let mut input = String::new();
@@ -35,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .read_line(&mut input)
             .expect("failed to read input");
 
-        let curr_op = parse_line(&input)?;
+        let mut curr_op = parse_line(&input)?;
 
         match curr_op.operation_type {
             OperationType::Get => {
@@ -43,12 +47,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                 println!("{}", scan_res);
             }
             OperationType::Set => {
-                let record = format!("{} {}\n", curr_op.key, curr_op.value.unwrap());
+                let record = format!("{} {}\n", curr_op.key, curr_op.value.clone().unwrap());
                 writer.write_all(record.as_bytes())?;
 
                 writer.flush()?;
 
                 num_records += 1;
+
+                index.insert(curr_op.key.clone(), cursor);
+                cursor += curr_op.key.len() + curr_op.value.clone().unwrap().len() + 2;
+                println!("{:?}", index);
             }
         }
 
