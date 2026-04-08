@@ -43,8 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         match curr_op.operation_type {
             OperationType::Get => {
-                let scan_res = search_file(&curr_op.key, n)?;
-                println!("{}", scan_res);
+                let scan_res = search_file(&curr_op.key, &index, n)?;
             }
             OperationType::Set => {
                 let record = format!("{} {}\n", curr_op.key, curr_op.value.clone().unwrap());
@@ -56,7 +55,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                 index.insert(curr_op.key.clone(), cursor);
                 cursor += curr_op.key.len() + curr_op.value.clone().unwrap().len() + 2;
-                println!("{:?}", index);
             }
         }
 
@@ -95,7 +93,14 @@ fn parse_line(input: &str) -> Result<Operation, Box<dyn Error>> {
     }
 }
 
-fn search_file(key: &str, n: i32) -> Result<String, Box<dyn Error>> {
+fn search_file(
+    key: &str,
+    index: &HashMap<String, usize>,
+    n: i32,
+) -> Result<String, Box<dyn Error>> {
+    if let Some(&offset) = index.get(key) {
+        println!("offset: {:?}", offset);
+    }
     for segment in (0..n).rev() {
         let file = File::open(format!("db{}.log", segment))?;
         let reader = BufReader::new(file);
