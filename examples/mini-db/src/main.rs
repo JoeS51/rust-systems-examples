@@ -3,7 +3,7 @@ use std::error::Error;
 use std::fs::OpenOptions;
 use std::fs::{self, File};
 use std::io;
-use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::io::{BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
 
 #[derive(PartialEq)]
 enum OperationType {
@@ -17,8 +17,16 @@ struct Operation {
     value: Option<String>,
 }
 
+struct Segment {
+    id: u32,
+    index: HashMap<String, usize>,
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut n = 0;
+    // Clear previously written db files
+    clear_db_files()?;
+
+    let mut n: u32 = 0;
 
     let mut file = OpenOptions::new()
         .create(true)
@@ -28,7 +36,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut writer = BufWriter::new(file);
     let mut num_records = 0;
 
-    let mut index: HashMap<String, usize> = HashMap::new();
+    let index: HashMap<String, usize> = HashMap::new();
+    let mut segments: Vec<Segment> = Vec::new();
+    segments.push(Segment {
+        id: n,
+        index: HashMap::new(),
+    });
     let mut cursor: usize = 0;
 
     loop {
@@ -43,7 +56,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         match curr_op.operation_type {
             OperationType::Get => {
-                let scan_res = search_file(&curr_op.key, &index, n)?;
+                let scan_res = search_file(&curr_op.key, &segments, n)?;
+                println!("{scan_res}");
             }
             OperationType::Set => {
                 let record = format!("{} {}\n", curr_op.key, curr_op.value.clone().unwrap());
@@ -53,7 +67,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                 num_records += 1;
 
-                index.insert(curr_op.key.clone(), cursor);
+                segments
+                    .get_mut(n as usize)
+                    .unwrap()
+                    .index
+                    .insert(curr_op.key.clone(), cursor);
+
                 cursor += curr_op.key.len() + curr_op.value.clone().unwrap().len() + 2;
             }
         }
@@ -69,6 +88,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             writer = BufWriter::new(file);
             compact_old_log(n - 1)?;
+
+            segments.push(Segment {
+                id: n,
+                index: HashMap::new(),
+            });
 
             num_records = 0;
         }
@@ -93,38 +117,30 @@ fn parse_line(input: &str) -> Result<Operation, Box<dyn Error>> {
     }
 }
 
-fn search_file(
-    key: &str,
-    index: &HashMap<String, usize>,
-    n: i32,
-) -> Result<String, Box<dyn Error>> {
-    if let Some(&offset) = index.get(key) {
+fn search_file(key: &str, segments: &Vec<Segment>, n: u32) -> Result<String, Box<dyn Error>> {
+    if let Some(&offset) = segments.get(n as usize).unwrap().index.get(key) {
         println!("offset: {:?}", offset);
-    }
-    for segment in (0..n).rev() {
-        let file = File::open(format!("db{}.log", segment))?;
-        let reader = BufReader::new(file);
+        let mut file = File::open(format!("db{}.log", n))?;
+        file.seek(SeekFrom::Start(offset as u64))?;
 
-        let mut found = None;
+        let mut reader = BufReader::new(file);
+        let mut line = String::new();
+        reader.read_line(&mut line)?;
 
-        for line in reader.lines() {
-            let line = line?;
-            let parts: Vec<&str> = line.split_whitespace().collect();
-
-            if parts.len() == 2 && parts[0] == key {
-                found = Some(parts[1].to_string());
-            }
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        let id = parts[0].to_string();
+        let value = parts[1].to_string();
+        if parts.len() == 2 && id == key {
+            return Ok(value.to_string());
+        } else {
+            return Ok("corrupted data or somethign".to_string());
         }
-
-        if let Some(value) = found {
-            return Ok(value);
-        }
+    } else {
+        Ok("not found".to_string())
     }
-
-    Ok("not found".to_string())
 }
 
-fn compact_old_log(segment: i32) -> Result<String, Box<dyn Error>> {
+fn compact_old_log(segment: u32) -> Result<String, Box<dyn Error>> {
     let original = format!("db{}.log", segment);
     let temp = format!("db{}.tmp", segment);
 
@@ -157,4 +173,19 @@ fn compact_old_log(segment: i32) -> Result<String, Box<dyn Error>> {
     fs::rename(&temp, &original)?;
 
     Ok("test".to_string())
+}
+
+fn clear_db_files() -> Result<(), Box<dyn std::error::Error>> {
+    let entries = fs::read_dir(".")?;
+    for entry in entries {
+        let entry = entry?;
+        let path = entry.path();
+        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+            if name.starts_with("db") && name.ends_with(".log") {
+                fs::remove_file(&path)?;
+            }
+        }
+    }
+
+    Ok(())
 }
