@@ -21,8 +21,20 @@ fn main() {
             &System::host_name().unwrap(),
         ]);
 
-    for (pid, process) in sys.processes() {
-        println!("[{pid}] {:?} {:?}", process.name(), process.disk_usage());
+    let mut processes: Vec<_> = sys.processes().iter().collect();
+    processes.sort_by_key(|(_, process)| process.memory());
+    processes.reverse();
+
+    for (pid, process) in processes.iter().take(10) {
+        let mem_usage = process.memory() as f64 / 1024.0 / 1024.0;
+        println!(
+            "{:?} {:?} {:?}mb {:?} {:?}",
+            pid,
+            process.name(),
+            mem_usage,
+            process.cpu_usage(),
+            process.status()
+        );
     }
 
     println!("{table}");
