@@ -1,3 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["examples/*", "crates/*"]
+members = ["crates/*"]
+
+[profile.dev]
+panic = "unwind"
+
+[profile.release]
+debug = true
+panic = "unwind"

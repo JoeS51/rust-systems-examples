@@ -1,5 +1,5 @@
 [package]
-name = "mini-reverse-proxy"
+name = "flame-graph"
 version = "0.1.0"
 edition = "2024"
 
