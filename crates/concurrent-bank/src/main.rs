@@ -1,15 +1,21 @@
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::collections::HashMap;
 
 fn main() {
     let bank = Arc::new(Mutex::new(HashMap::new()));
-    let tx1 = Arc::clone(&bank);
-    let handle = thread::spawn(move || {
-        tx1.lock().unwrap().insert("test", "test");
-    });
+    let mut handles = vec![];
+    for i in 1..4 {
+        let tx1 = Arc::clone(&bank);
+        let handle = thread::spawn(move || {
+            tx1.lock().unwrap().insert(format!("test{}", i), "test");
+        });
+        handles.push(handle);
+    }
 
-    handle.join().unwrap();
+    for handle in handles {
+        handle.join().unwrap();
+    }
 
     println!("{:?}", bank);
 }
