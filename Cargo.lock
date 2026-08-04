@@ -625,6 +625,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "concurrent-bank"
+version = "0.1.0"
+
+[[package]]
 name = "const-oid"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2912,6 +2916,10 @@ dependencies = [
  "errno",
  "libc",
 ]
+
+[[package]]
+name = "simd"
+version = "0.1.0"
 
 [[package]]
 name = "siphasher"
