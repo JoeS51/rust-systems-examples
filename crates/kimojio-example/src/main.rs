@@ -14,12 +14,13 @@ async fn main() -> Result<(), Errno> {
     let w_fd = operations::open(c"output.txt", write_flags, 0o644.into()).await?;
 
     let mut buffer = [0u8; 32];
-    let read_res = operations::read(&rd_fd, &mut buffer).await?;
+    let bytes_read = operations::read(&rd_fd, &mut buffer).await?;
 
-    println!("read res {}", read_res);
+    println!("read res {}", bytes_read);
 
-    operations::write(&w_fd, &buffer).await?;
+    operations::write(&w_fd, &buffer[..bytes_read]).await?;
 
     operations::close(rd_fd).await?;
+    operations::close(w_fd).await?;
     Ok(())
 }
