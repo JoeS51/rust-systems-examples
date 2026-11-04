@@ -1,0 +1,59 @@
+# 1 primary + 2 async streaming replicas. Local throwaway lab only.
+# Host ports 5442-5444 (5432 is already taken on this machine).
+
+x-replica: &replica
+  image: postgres:17
+  environment:
+    PGPASSWORD: replicator
+  entrypoint: ["/bin/bash", "-c"]
+  command:
+    - |
+      set -e
+      until pg_isready -h primary -U postgres; do sleep 1; done
+      if [ ! -s "$$PGDATA/PG_VERSION" ]; then
+        pg_basebackup -h primary -U replicator -D "$$PGDATA" -Fp -Xs -P -R
+      fi
+      exec docker-entrypoint.sh postgres
+  depends_on:
+    primary:
+      condition: service_healthy
+
+services:
+  primary:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: testdb
+    # wal_keep_size: keep recent WAL around so a replica that's cloning/lagging
+    # doesn't ask for a segment the primary already recycled.
+    command: ["postgres", "-c", "wal_level=replica", "-c", "max_wal_senders=10",
+              "-c", "hot_standby=on", "-c", "wal_keep_size=256MB"]
+    ports:
+      - "5442:5432"
+    volumes:
+      - primary_data:/var/lib/postgresql/data
+      - ./primary/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      retries: 15
+
+  replica1:
+    <<: *replica
+    ports:
+      - "5443:5432"
+    volumes:
+      - replica1_data:/var/lib/postgresql/data
+
+  replica2:
+    <<: *replica
+    ports:
+      - "5444:5432"
+    volumes:
+      - replica2_data:/var/lib/postgresql/data
+
+volumes:
+  primary_data:
+  replica1_data:
+  replica2_data:

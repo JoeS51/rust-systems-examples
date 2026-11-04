@@ -3531,6 +3531,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "pg-failover"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+ "tokio-postgres",
+]
+
+[[package]]
 name = "pg_extension"
 version = "0.0.0"
 dependencies = [
